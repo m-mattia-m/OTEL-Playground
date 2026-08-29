@@ -1,0 +1,55 @@
+# Runs only for a release tag and is the only workflow which publishes. The
+# image is tagged with the git tag it was built from, e.g. 'v1.0.0' or
+# 'v1.0.0-RC1'.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-RC[0-9]+"
+
+permissions:
+  contents: read
+  # Needed to push to ghcr.io; nothing else in this workflow writes.
+  packages: write
+
+jobs:
+  publish:
+    name: Build and push the image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the tag
+        # The trigger above already filters, so this only catches a filter which
+        # was loosened by accident. A wrong tag must never reach the registry.
+        run: |
+          if ! printf '%s' "${{ github.ref_name }}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-RC[0-9]+)?$'; then
+            echo "'${{ github.ref_name }}' is not a release tag (v1.0.0 or v1.0.0-RC1)."
+            exit 1
+          fi
+
+      - name: Resolve the image name
+        # ghcr.io only accepts a lower case name, the repository is mixed case.
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

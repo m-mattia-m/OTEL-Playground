@@ -1,0 +1,45 @@
+# Runs Renovate itself, once a month. Without this workflow the configuration in
+# .github/renovate.json is only read by the hosted Renovate App; here the
+# self-hosted image does the same work from this repository.
+name: Renovate
+
+on:
+  schedule:
+    # 03:00 UTC on the first day of the month. This cron is the whole schedule:
+    # .github/renovate.json deliberately carries no 'schedule', because a second
+    # window there would silently drop every update which falls outside of it.
+    - cron: "0 3 1 * *"
+  # So a run can be triggered by hand instead of waiting for the first.
+  workflow_dispatch:
+
+permissions:
+  # Only used when the workflow falls back to GITHUB_TOKEN; a RENOVATE_TOKEN
+  # brings its own permissions.
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # Two Renovate runs on the same repository would fight over the same branches.
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Update the dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: renovatebot/github-action@v46.2.4
+        with:
+          # A pull request which GITHUB_TOKEN opened does not start another
+          # workflow, so build.yml would never run on it. A personal access
+          # token or a GitHub App token in RENOVATE_TOKEN avoids that; the
+          # fallback only keeps the workflow from failing without one.
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
+        env:
+          # Only this repository. Renovate reads its own configuration out of
+          # the clone, so the configuration file is not handed over here: the
+          # input of the action is the global configuration, which is a
+          # different shape than .github/renovate.json.
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_PLATFORM: github
+          LOG_LEVEL: info

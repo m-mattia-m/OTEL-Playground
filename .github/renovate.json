@@ -1,0 +1,52 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "Europe/Zurich",
+  "labels": [
+    "dependencies"
+  ],
+  "prConcurrentLimit": 5,
+  "packageRules": [
+    {
+      "description": "Go modules. Only the non-major steps are grouped; a major one gets its own pull request, because it is the one which needs to be read.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "go modules"
+    },
+    {
+      "description": "Every container image: the base images of the Dockerfile and the images of the development compose files.",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "container images"
+    },
+    {
+      "description": "The actions and the runners of the workflows.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    },
+    {
+      "description": "The Go directive in go.mod follows the toolchain of the Dockerfile, so it is not bumped on its own.",
+      "matchDepTypes": [
+        "golang"
+      ],
+      "enabled": false
+    }
+  ]
+}

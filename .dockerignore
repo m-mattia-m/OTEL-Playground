@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.vscode
+
+# Every local override stays out of the image; only the base configuration
+# belongs into it.
+.env
+config.*.yaml
+!config.default.yaml
+
+development-infrastructure
+integrationtess
+Dockerfile
+.dockerignore
+README.md
+LICENSE
