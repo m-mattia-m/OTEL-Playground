@@ -13,6 +13,9 @@ jobs:
   go:
     name: Test and build
     runs-on: ubuntu-latest
+    permissions:
+      # Write is needed to commit the coverage badge to the 'badges' branch.
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -37,8 +40,45 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Test
+      - name: Unit test
         run: go test -race ./...
+
+      # One run with the integration tag covers the unit tests and the
+      # integration tests, so the profile describes the whole application.
+      # -coverpkg attributes what the integration tests reach to the packages
+      # they exercise, instead of to the test package itself. Needs a Docker
+      # daemon for testcontainers, which the runner provides.
+      - name: Test with coverage
+        run: |
+          go test -tags=integration \
+            -covermode=atomic \
+            -coverpkg=./internal/...,./utils/... \
+            -coverprofile=coverage.out \
+            ./...
+
+      # Writes the per package breakdown into the summary of the run and, on
+      # main, commits the badge to the orphan 'badges' branch of this
+      # repository. GitHub has no coverage feature of its own, so the badge has
+      # to be a file somewhere; this keeps it inside the repository instead of
+      # in a third party service.
+      - name: Coverage summary and badge
+        uses: vladopajic/go-test-coverage@v2.19.0
+        with:
+          profile: coverage.out
+          # An empty token turns the badge off, so only main writes one.
+          git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
+          git-branch: badges
+
+      - name: Coverage report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 14
 
   image:
     name: Build the image
