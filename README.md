@@ -7,7 +7,7 @@ But it also includes some other services like an IdP.
 
 ## Services
 
-> Start everything with `docker compose up --project-directory ./infrastructure -d`
+> Start everything with `docker compose --project-directory ./development-infrastructure up -d`
 
 - APP Postgres database -> `postgres://app:app@localhost:5432/app?sslmode=disable`
 - Zitadel -> [http://localhost:8080](http://localhost:8080)
@@ -36,16 +36,20 @@ refresh the site).
 
 ## Project structure
 
-- api -> everything which is related with the API
-  - controller -> the API / endpoint itself
-  - response -> the response structure for the API endpoints
-  - model -> the object definition for the API models
-  - mapper -> the mapping logic between the API models and the underlying data structures
-- config -> configuration model and logic to read and access the configuration
+- .github -> the pipelines and the Renovate configuration
+- assets -> static files which are embedded into the binary
+- cmd -> the entrypoints; `app` is the API itself
+- development-infrastructure -> dev infrastructure for compose files and its configuration
+- integrationtests -> tests which drive the whole application over HTTP against a real database
 - internal -> everything in the core-application
+  - config -> configuration model and logic to read and access the configuration
   - domain -> the business-logic; should be split up by **use-case**
-  - service -> the general abstracted logic; should be split up by **functionality**
-  - repository -> the database connection including the whole data access logic
-- infrastructure -> dev infrastructure for compose files and its configuration
+  - infrastructure -> everything which talks to the outside
+    - api -> everything which is related with the API
+      - controller -> the API / endpoint itself
+      - response -> the response structure for the API endpoints
+      - model -> the object definition for the API models
+      - mapper -> the mapping logic between the API models and the underlying data structures
+    - repository -> the database connection including the whole data access logic
 - migrations -> database migrations
 - utils -> utils and helper files which where useful in any layer
