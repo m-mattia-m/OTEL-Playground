@@ -67,7 +67,7 @@ jobs:
           profile: coverage.out
           # An empty token turns the badge off, so only main writes one.
           git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
-          git-branch: badges
+          git-branch: main
 
       - name: Coverage report
         run: go tool cover -html=coverage.out -o coverage.html
