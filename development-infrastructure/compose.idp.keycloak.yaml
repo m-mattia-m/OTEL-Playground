@@ -1,0 +1,75 @@
+# Keycloak + its own database.
+#
+#   docker compose -f compose.idp.keycloak.yaml up -d
+#
+#   http://localhost:8082                 admin console (admin / admin)
+#   http://localhost:8082/realms/dev/.well-known/openid-configuration
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME: http://localhost:8082
+      KC_HOSTNAME_STRICT: "false"
+
+      # Health + metrics live on the management port (9000) since KC 25.
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+
+      # Keycloak speaks OTLP natively since 25 — same collector as your app.
+      KC_TRACING_ENABLED: "true"
+      KC_TRACING_ENDPOINT: http://otel-collector:4317
+      KC_TRACING_SERVICE_NAME: keycloak
+      KC_TRACING_SAMPLER_TYPE: always_on
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./configuration.keycloak.json:/opt/keycloak/data/import/realm.json:ro
+    healthcheck:
+      # The image ships no curl/wget, so talk to the management port
+      # through bash's /dev/tcp.
+      test:
+        - 'CMD-SHELL'
+        - '[ -f /tmp/HealthCheck.java ] || echo "public class HealthCheck { public static void main(String[] args) throws java.lang.Throwable { System.exit(java.net.HttpURLConnection.HTTP_OK == ((java.net.HttpURLConnection)new java.net.URL(args[0]).openConnection()).getResponseCode() ? 0 : 1); } }" > /tmp/HealthCheck.java && java /tmp/HealthCheck.java http://localhost:9000/health/live'
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+  keycloak-db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+      POSTGRES_DB: keycloak
+    ports:
+      - "5433:5432"
+    volumes:
+      # Postgres 18 wants the mount one level above data/.
+      - keycloak-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  keycloak-db-data:

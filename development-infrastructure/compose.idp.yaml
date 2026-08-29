@@ -1,0 +1,51 @@
+# ZITADEL + its own database.
+#
+#   http://localhost:8080/ui/console   admin@zitadel.localhost / Password1!
+#   http://localhost:8080/.well-known/openid-configuration
+
+services:
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.13.0
+    restart: unless-stopped
+    command: >
+      start-from-init
+      --config /configuration.yaml
+      --steps /configuration.yaml
+      --masterkeyFromEnv
+      --tlsMode disabled
+    environment:
+      # Must be exactly 32 characters, and cannot be changed later.
+      ZITADEL_MASTERKEY: MasterkeyNeedsToHave32Characters
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configuration.zitadel.yaml:/configuration.yaml:ro
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+
+  zitadel-db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - zitadel-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  zitadel-db-data:

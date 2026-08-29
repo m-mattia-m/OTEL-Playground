@@ -1,0 +1,19 @@
+# A standalone page which fetches a bearer token from any OIDC issuer with the
+# authorization code flow and PKCE. It knows nothing about the API; it only
+# talks to the issuer, so it works with Keycloak, Zitadel or anything else which
+# serves a discovery document.
+#
+#   docker compose -f compose.tokenui.yaml up -d
+#   http://localhost:8085
+#
+# The issuer needs a public client with 'http://localhost:8085/' as a redirect
+# URI and as an allowed origin, because the token is fetched by the browser.
+
+services:
+  token-ui:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    volumes:
+      - ./token-ui/index.html:/usr/share/nginx/html/index.html:ro

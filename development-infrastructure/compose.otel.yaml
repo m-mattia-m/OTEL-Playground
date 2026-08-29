@@ -1,0 +1,84 @@
+# Official OTel collector -> ClickHouse -> Grafana. Three containers.
+#
+#   docker compose up -d
+#
+#   localhost:4317 / 4318   OTLP in
+#   localhost:3000          Grafana
+#   localhost:8123          ClickHouse HTTP — query your telemetry with SQL
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.21
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: otel
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.158.0
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./configuration.otel.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:13.0-slim
+    restart: unless-stopped
+    environment:
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana:/var/lib/grafana
+    configs:
+      - source: datasource
+        target: /etc/grafana/provisioning/datasources/clickhouse.yaml
+
+volumes:
+  clickhouse:
+  grafana:
+
+configs:
+  datasource:
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: ClickHouse
+          type: grafana-clickhouse-datasource
+          uid: clickhouse
+          jsonData:
+            host: clickhouse
+            port: 9000
+            protocol: native
+            username: default
+            defaultDatabase: otel
+            logs:
+              defaultDatabase: otel
+              defaultTable: otel_logs
+              otelEnabled: true
+              otelVersion: latest
+            traces:
+              defaultDatabase: otel
+              defaultTable: otel_traces
+              otelEnabled: true
+              otelVersion: latest
+          secureJsonData:
+            password: clickhouse

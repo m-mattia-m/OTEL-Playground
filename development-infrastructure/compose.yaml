@@ -1,0 +1,14 @@
+# docker compose up -d
+#
+# Each stack is self-contained and can also run alone:
+#   docker compose -f compose.postgres.yaml up -d
+
+name: devstack
+
+include:
+  - compose.postgres.yaml
+  - compose.idp.yaml
+  - compose.idp.keycloak.yaml
+  - compose.tokenui.yaml
+  - compose.otel.yaml
+  - compose.otel.hyperdx.yaml

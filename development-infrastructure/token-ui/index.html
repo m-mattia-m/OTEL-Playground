@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#111; --muted:#666; --line:#d8d8d8; --accent:#2d6cdf; --code:#f4f4f5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16181d; --fg:#e8e8ea; --muted:#9a9aa2; --line:#2e3239; --accent:#5b8dee; --code:#1e2127; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2rem 1.25rem; background:var(--bg); color:var(--fg);
+         font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size:1.25rem; margin:0 0 .25rem; }
+  p.sub { color:var(--muted); margin:0 0 1.5rem; }
+  label { display:block; font-size:.8rem; color:var(--muted); margin:.85rem 0 .25rem; }
+  input { width:100%; padding:.55rem .65rem; border:1px solid var(--line); border-radius:6px;
+          background:var(--bg); color:var(--fg); font:inherit; font-size:.9rem; }
+  button { margin-top:1.25rem; padding:.6rem 1.1rem; border:0; border-radius:6px;
+           background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); font-weight:500;
+                 padding:.35rem .7rem; margin:0 0 0 .5rem; font-size:.8rem; }
+  section { margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--line); }
+  h2 { font-size:.85rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 .5rem; }
+  pre { background:var(--code); padding:.75rem; border-radius:6px; overflow-x:auto;
+        font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; margin:0; word-break:break-all; white-space:pre-wrap; }
+  .err { color:#c0392b; }
+  .row { display:flex; align-items:center; justify-content:space-between; }
+  .hint { color:var(--muted); font-size:.78rem; margin-top:.4rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Get a bearer token</h1>
+  <p class="sub">Authorization code with PKCE, against any OIDC issuer. Nothing is sent anywhere but the issuer.</p>
+
+  <label for="issuer">Issuer</label>
+  <input id="issuer" spellcheck="false" placeholder="https://issuer.example.com">
+
+  <label for="clientId">Client ID <span class="hint">(must be a public client with PKCE)</span></label>
+  <input id="clientId" spellcheck="false">
+
+  <label for="scope">Scopes</label>
+  <input id="scope" spellcheck="false">
+  <div class="hint">Zitadel needs <code>urn:zitadel:iam:org:project:id:&lt;projectId&gt;:aud</code> here to put your API in the audience.</div>
+
+  <button id="go">Sign in and get token</button>
+  <button id="reset" class="ghost" hidden>Clear</button>
+
+  <div id="out"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const out = $("out");
+const REDIRECT = location.origin + location.pathname;
+
+const DEFAULTS = {
+  issuer:   "http://localhost:8082/realms/otel-playground",
+  clientId: "otel-playground",
+  scope:    "openid profile email",
+};
+
+for (const k of ["issuer", "clientId", "scope"]) {
+  $(k).value = localStorage.getItem("tokenui." + k) ?? DEFAULTS[k];
+  $(k).addEventListener("change", () => localStorage.setItem("tokenui." + k, $(k).value.trim()));
+}
+
+const b64url = (bytes) =>
+  btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+
+const randomString = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
+
+async function challenge(verifier) {
+  return b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+}
+
+async function discover(issuer) {
+  const res = await fetch(issuer.replace(/\/$/, "") + "/.well-known/openid-configuration");
+  if (!res.ok) throw new Error("discovery failed: HTTP " + res.status);
+  return res.json();
+}
+
+function decode(jwt) {
+  const parts = jwt.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    return JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+  } catch { return null; }
+}
+
+function block(title, body, extra) {
+  const s = document.createElement("section");
+  const h = document.createElement("div");
+  h.className = "row";
+  h.innerHTML = "<h2>" + title + "</h2>";
+  if (extra) h.appendChild(extra);
+  const pre = document.createElement("pre");
+  pre.textContent = body;
+  s.append(h, pre);
+  out.appendChild(s);
+  return s;
+}
+
+function copyButton(text) {
+  const b = document.createElement("button");
+  b.className = "ghost";
+  b.textContent = "Copy";
+  b.onclick = async () => {
+    await navigator.clipboard.writeText(text);
+    b.textContent = "Copied";
+    setTimeout(() => (b.textContent = "Copy"), 1200);
+  };
+  return b;
+}
+
+function fail(message) {
+  const s = document.createElement("section");
+  s.innerHTML = '<h2 class="err">Failed</h2>';
+  const pre = document.createElement("pre");
+  pre.className = "err";
+  pre.textContent = message;
+  s.appendChild(pre);
+  out.appendChild(s);
+}
+
+$("go").onclick = async () => {
+  out.innerHTML = "";
+  const issuer = $("issuer").value.trim();
+  const clientId = $("clientId").value.trim();
+  const scope = $("scope").value.trim();
+  if (!issuer || !clientId) return fail("Issuer and client ID are required.");
+
+  try {
+    const meta = await discover(issuer);
+    const verifier = randomString();
+    const state = randomString();
+    sessionStorage.setItem("tokenui.verifier", verifier);
+    sessionStorage.setItem("tokenui.state", state);
+    sessionStorage.setItem("tokenui.token_endpoint", meta.token_endpoint);
+    sessionStorage.setItem("tokenui.clientId", clientId);
+
+    const url = new URL(meta.authorization_endpoint);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("redirect_uri", REDIRECT);
+    url.searchParams.set("scope", scope);
+    url.searchParams.set("state", state);
+    url.searchParams.set("code_challenge", await challenge(verifier));
+    url.searchParams.set("code_challenge_method", "S256");
+    location.assign(url.toString());
+  } catch (e) {
+    fail(String(e && e.message ? e.message : e));
+  }
+};
+
+$("reset").onclick = () => {
+  sessionStorage.clear();
+  location.assign(REDIRECT);
+};
+
+(async function onReturn() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  const error = params.get("error");
+  if (!code && !error) return;
+
+  history.replaceState({}, "", REDIRECT);
+  $("reset").hidden = false;
+
+  if (error) return fail(error + ": " + (params.get("error_description") || ""));
+
+  if (params.get("state") !== sessionStorage.getItem("tokenui.state")) {
+    return fail("state mismatch — the response does not belong to this request.");
+  }
+
+  try {
+    const res = await fetch(sessionStorage.getItem("tokenui.token_endpoint"), {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT,
+        client_id: sessionStorage.getItem("tokenui.clientId"),
+        code_verifier: sessionStorage.getItem("tokenui.verifier"),
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok) return fail(JSON.stringify(body, null, 2));
+
+    block("Access token", body.access_token, copyButton(body.access_token));
+    const claims = decode(body.access_token);
+    if (claims) {
+      block("Access token claims", JSON.stringify(claims, null, 2));
+    } else {
+      block("Access token claims", "Not a JWT — this issuer returns an opaque access token, which the API cannot verify locally.");
+    }
+    if (body.id_token) {
+      const idClaims = decode(body.id_token);
+      block("ID token claims (not for API calls)", JSON.stringify(idClaims, null, 2));
+    }
+  } catch (e) {
+    fail(String(e && e.message ? e.message : e));
+  }
+})();
+</script>
+</body>
+</html>

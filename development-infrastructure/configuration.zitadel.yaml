@@ -1,0 +1,80 @@
+# ZITADEL configuration.
+#
+# Passed to the container as both --config (runtime settings) and --steps
+# (first-instance bootstrap), so everything lives in one file.
+#
+# The FirstInstance section is read ONCE, during the very first start.
+# Editing it later changes nothing — run `docker compose down -v` to redo it.
+#
+# All available keys and their defaults:
+#   https://github.com/zitadel/zitadel/blob/main/cmd/defaults.yaml
+#   https://github.com/zitadel/zitadel/blob/main/cmd/setup/steps.yaml
+
+Port: 8080
+ExternalDomain: localhost
+ExternalPort: 8080
+ExternalSecure: false
+TLS:
+  Enabled: false
+
+Log:
+  Level: info
+
+Database:
+  postgres:
+    Host: zitadel-db
+    Port: 5432
+    Database: zitadel
+    MaxOpenConns: 20
+    MaxIdleConns: 10
+    # ZITADEL connects as Admin once to create the database and the user below.
+    Admin:
+      Username: postgres
+      Password: postgres
+      SSL:
+        Mode: disable
+    User:
+      Username: zitadel
+      Password: zitadel
+      SSL:
+        Mode: disable
+
+# Send ZITADEL's own traces to the collector in compose.otel.yaml.
+Instrumentation:
+  ServiceName: zitadel
+  Trace:
+    Exporter:
+      Type: grpc
+      Endpoint: otel-collector:4317
+      Insecure: true
+
+DefaultInstance:
+  Features:
+    LoginV2:
+      # false = use the built-in login UI, so one container is enough.
+      Required: false
+
+FirstInstance:
+  InstanceName: dev
+  DefaultLanguage: en
+  Org:
+    Name: ZITADEL
+    Human:
+      UserName: admin
+      FirstName: Dev
+      LastName: Admin
+      Email:
+        Address: admin@zitadel.localhost
+        Verified: true
+      Password: Password1!
+      PasswordChangeRequired: false
+  LoginPolicy:
+    AllowUsernamePassword: true
+    AllowRegister: false
+    ForceMFA: false
+  PasswordComplexityPolicy:
+    MinLength: 8
+    HasLowercase: true
+    HasUppercase: true
+    HasNumber: true
+    HasSymbol: true

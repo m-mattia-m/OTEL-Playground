@@ -1,0 +1,82 @@
+# Base configuration. This is the only config file that is tracked in git, so
+# it must not contain any environment specific or secret value.
+#
+# It gets overwritten, value by value, in this order:
+#   config.default.yaml -> $CONFIGURATION_FILE_PATH -> env vars
+#
+# CONFIGURATION_FILE_PATH points to a second, untracked config file, e.g.
+# CONFIGURATION_FILE_PATH=config.prod.yaml. It only needs the keys it wants to
+# change; everything else falls through to this file. Without the env var only
+# this file gets loaded.
+# App is the public API which holds all the resources. It runs behind
+# its own port and can be exposed publicly.
+app:
+  name: OTEL Playground
+  description: A simple OTEL playground.
+  version: 0.1.0
+  env: development
+  port: 8083
+  contact:
+    name: John Doe
+    mail: john.doe@example.com
+  # Path (/docs) or URI (https://example.com) are possible
+  root:
+    redirect: /docs
+
+# Management is the internal API which holds the probes and the metrics. It
+# runs behind its own port and should not be exposed publicly.
+management:
+  port: 8084
+  metrics:
+    enabled: true
+    path: /metrics
+  probes:
+    readiness: true
+    liveness: true
+
+api:
+  trusted_proxies:
+    - 127.0.0.1
+    - 0.0.0.0
+
+database:
+  host: localhost
+  port: 5432
+  name: app
+  user: app
+  # The password must not be tracked in git. Set it with DATABASE_PASSWORD.
+  password: ""
+  # How the connection is encrypted: disable, allow, prefer, require, verify-ca
+  # or verify-full. Every deployment has to raise this.
+  ssl_mode: disable
+  # Upper limit of the connection pool.
+  max_connections: 10
+
+logging:
+  level: debug
+
+authentication:
+  # Turns the verification of the tokens off. It only exists for development:
+  # the application refuses to start with it in any other environment, so a
+  # wrong configuration cannot reach a deployment unauthenticated.
+  skip: false
+  oidc:
+    issuer: https://zitadel.example.com
+    clientId: 1234
+    # The 'aud' claim a token has to carry. Empty falls back to the client id
+    # above, which is what an ID token carries. An access token is audienced to
+    # the API instead, so its audience belongs here.
+    audience: ""
+
+# OTEL is a basic abstraction of the default OpenTelemetry environment variables:
+# https://pkg.go.dev/go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp#WithEndpoint
+otel:
+  traces:
+    exporter: otlp
+  metrics:
+    exporter: otlp
+  logs:
+    exporter: otlp
+  exporter:
+    otlp:
+      endpoint: localhost:4318

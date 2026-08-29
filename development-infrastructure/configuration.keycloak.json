@@ -1,0 +1,55 @@
+{
+  "realm": "otel-playground",
+  "enabled": true,
+  "sslRequired": "none",
+  "users": [
+    {
+      "username": "otel-playground",
+      "email": "otel-playground@test.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "OTEL",
+      "lastName": "Playground Developer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "otel-playground",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "enabled": true,
+      "clientId": "otel-playground",
+      "name": "OTEL Playground",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8085/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8085"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "otel-playground",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "otel-playground",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

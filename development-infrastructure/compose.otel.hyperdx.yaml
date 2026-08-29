@@ -1,0 +1,34 @@
+# HyperDX — optional UI over the ClickHouse you already run.
+#
+#   docker compose -f compose.yaml -f compose.otel.hyperdx.yaml up -d
+#
+#   http://localhost:8080   HyperDX  (create a user on first visit)
+#
+# Reads the same otel_logs / otel_traces / otel_metrics_* tables Grafana does.
+# Ingestion is unchanged — your collector keeps writing, HyperDX only reads.
+#
+# The ClickHouse connection and the sources live in the env vars:
+# DEFAULT_CONNECTIONS and DEFAULT_SOURCES,
+# so there's no setup wizard. HyperDX has no file-based config, so they have
+# to arrive as environment variables; env_file just keeps them out of here.
+#
+# MongoDB holds HyperDX's own state (users, dashboards, saved searches).
+# No telemetry, so nothing to back up.
+
+services:
+  hyperdx:
+    image: docker.hyperdx.io/hyperdx/hyperdx-local:latest
+    restart: unless-stopped
+    ports:
+      - "8081:8081"   # UI
+      - "8000:8000"   # API
+    environment:
+      FRONTEND_URL: http://localhost:8081
+      HYPERDX_APP_URL: http://localhost
+      HYPERDX_APP_PORT: "8081"
+      HYPERDX_API_PORT: "8000"
+      SERVER_URL: http://127.0.0.1:8000
+      HYPERDX_LOG_LEVEL: info
+      DEFAULT_CONNECTIONS: '[{"name":"ClickHouse","host":"http://clickhouse:8123","username":"default","password":"clickhouse"}]'
+      DEFAULT_SOURCES: '[{"from":{"databaseName":"otel","tableName":"otel_logs"},"kind":"log","name":"Logs","timestampValueExpression":"Timestamp","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"Body","serviceNameExpression":"ServiceName","bodyExpression":"Body","eventAttributesExpression":"LogAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,SeverityText,Body","severityTextExpression":"SeverityText","traceIdExpression":"TraceId","spanIdExpression":"SpanId","connection":"ClickHouse","traceSourceId":"Traces","metricSourceId":"Metrics"},{"from":{"databaseName":"otel","tableName":"otel_traces"},"kind":"trace","name":"Traces","timestampValueExpression":"Timestamp","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"SpanName","serviceNameExpression":"ServiceName","eventAttributesExpression":"SpanAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,StatusCode,round(Duration/1e6),SpanName","traceIdExpression":"TraceId","spanIdExpression":"SpanId","durationExpression":"Duration","durationPrecision":9,"parentSpanIdExpression":"ParentSpanId","spanNameExpression":"SpanName","spanKindExpression":"SpanKind","statusCodeExpression":"StatusCode","statusMessageExpression":"StatusMessage","connection":"ClickHouse","logSourceId":"Logs","metricSourceId":"Metrics"},{"from":{"databaseName":"otel","tableName":""},"kind":"metric","name":"Metrics","timestampValueExpression":"TimeUnix","resourceAttributesExpression":"ResourceAttributes","metricTables":{"gauge":"otel_metrics_gauge","histogram":"otel_metrics_histogram","sum":"otel_metrics_sum"},"connection":"ClickHouse","logSourceId":"Logs","traceSourceId":"Traces"}]'
+      USAGE_STATS_ENABLED: "false"
