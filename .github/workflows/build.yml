@@ -9,12 +9,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Two runs of the same branch would race for the badge file, and a superseded
+  # run is not worth the minutes.
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   go:
     name: Test and build
     runs-on: ubuntu-latest
     permissions:
-      # Write is needed to commit the coverage badge to the 'badges' branch.
+      # Write is needed to commit the coverage badge back into main.
       contents: write
     steps:
       - uses: actions/checkout@v7
@@ -56,11 +62,13 @@ jobs:
             -coverprofile=coverage.out \
             ./...
 
-      # Writes the per package breakdown into the summary of the run and, on
-      # main, commits the badge to the orphan 'badges' branch of this
-      # repository. GitHub has no coverage feature of its own, so the badge has
-      # to be a file somewhere; this keeps it inside the repository instead of
-      # in a third party service.
+      # Writes the breakdown into the summary of the run and, on main, commits
+      # the badge into main itself. GitHub has no coverage feature of its own,
+      # so the badge has to be a file somewhere; this keeps it in the repository
+      # instead of in a third party service.
+      #
+      # The commit is made through the API with GITHUB_TOKEN, and a push from
+      # that token does not start another workflow, so this cannot loop.
       - name: Coverage summary and badge
         uses: vladopajic/go-test-coverage@v2.19.0
         with:
@@ -68,6 +76,9 @@ jobs:
           # An empty token turns the badge off, so only main writes one.
           git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
           git-branch: main
+          # Without this the path would carry the branch name a second time, as
+          # '.badges/main/coverage.svg' inside the main branch.
+          git-file-name: .badges/coverage.svg
 
       - name: Coverage report
         run: go tool cover -html=coverage.out -o coverage.html

@@ -1,6 +1,6 @@
 # OTEL-Playground
 
-![coverage](https://raw.githubusercontent.com/m-mattia-m/OTEL-Playground/badges/.badges/main/coverage.svg)
+![coverage](https://raw.githubusercontent.com/m-mattia-m/OTEL-Playground/main/.badges/coverage.svg)
 
 This is a basic setup of my OTEL playground. I want to explore and experiment with OpenTelemetry for future projects.
 But it also includes some other services like an IdP.

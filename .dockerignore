@@ -15,3 +15,6 @@ Dockerfile
 .dockerignore
 README.md
 LICENSE
+
+# The coverage badge which the pipeline commits; it is not part of the image.
+.badges
