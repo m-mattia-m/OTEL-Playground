@@ -5,7 +5,7 @@
 
 services:
   zitadel:
-    image: ghcr.io/zitadel/zitadel:v4.13.0
+    image: ghcr.io/zitadel/zitadel:v4.17.2
     restart: unless-stopped
     command: >
       start-from-init

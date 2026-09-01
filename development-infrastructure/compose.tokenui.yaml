@@ -11,7 +11,7 @@
 
 services:
   token-ui:
-    image: nginx:1.29-alpine
+    image: nginx:1.31-alpine
     restart: unless-stopped
     ports:
       - "8085:80"

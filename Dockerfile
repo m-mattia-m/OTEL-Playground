@@ -1,5 +1,5 @@
 # Build the binary statically, so the runtime image needs no libc at all.
-FROM golang:1.26 AS build
+FROM golang:1.27 AS build
 
 WORKDIR /src
 
